@@ -15,8 +15,8 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "jsx": "react",
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "examples"]
+  "exclude": ["node_modules", "dist", "examples", "tests"]
 }

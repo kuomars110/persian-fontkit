@@ -44,6 +44,7 @@ Persian fonts like **Vazir**, **IRANSans**, **Shabnam**, **Yekan**, and **Kalame
 - Support for `.ttf`, `.otf`, `.woff`, `.woff2` formats
 - Automatic subset generation (Persian + Latin + Numbers)
 - Hash-based cache-busting filenames
+- **Smart caching system** - Skip re-optimization of unchanged fonts (~100x faster)
 - Beautiful CLI output with progress tracking
 
 ### ⚛️ React Integration
@@ -266,6 +267,18 @@ npx persian-fontkit optimize ./fonts --no-hash
 # Custom CSS filename
 npx persian-fontkit optimize ./fonts --css custom-fonts.css
 
+# Disable caching (re-optimize all fonts)
+npx persian-fontkit optimize ./fonts --no-cache
+
+# Custom cache directory
+npx persian-fontkit optimize ./fonts --cache-dir ./.my-cache
+
+# View cache statistics
+npx persian-fontkit cache --stats
+
+# Clear cache
+npx persian-fontkit cache --clear
+
 # Show help
 npx persian-fontkit --help
 ```
@@ -293,9 +306,9 @@ function MyComponent() {
 ### Programmatic API
 
 ```typescript
-import { optimizeFont, optimizeFonts } from "persian-fontkit";
+import { optimizeFont, optimizeFonts, getGlobalCache } from "persian-fontkit";
 
-// Optimize a single font
+// Optimize a single font (cache enabled by default)
 const result = await optimizeFont({
   inputPath: "./fonts/vazir-regular.ttf",
   outputDir: "./dist/fonts",
@@ -303,9 +316,17 @@ const result = await optimizeFont({
   fontWeight: 400,
   subsets: ["farsi", "latin"],
   format: "woff2",
+  cache: true, // Default: true
 });
 
 console.log(`Reduced by ${result.reduction}%`);
+
+// Disable cache for specific optimization
+const result2 = await optimizeFont({
+  inputPath: "./fonts/special.ttf",
+  outputDir: "./dist/fonts",
+  cache: false, // Disable caching
+});
 
 // Optimize multiple fonts
 const results = await optimizeFonts(
@@ -313,6 +334,21 @@ const results = await optimizeFonts(
   "./dist/fonts",
   { subsets: ["farsi", "latin"] }
 );
+
+// Cache management
+const cache = getGlobalCache();
+
+// Get cache statistics
+const stats = await cache.getStats();
+console.log(`Cache entries: ${stats.entries}`);
+console.log(`Total size: ${stats.totalSize} bytes`);
+
+// Clear cache
+await cache.clear();
+
+// Clean old entries (older than 7 days)
+const deletedCount = await cache.cleanOld(7 * 24 * 60 * 60 * 1000);
+console.log(`Deleted ${deletedCount} old entries`);
 ```
 
 ---

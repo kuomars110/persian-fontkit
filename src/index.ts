@@ -14,6 +14,33 @@ export {
   type OptimizationResult,
 } from "./optimizer";
 
+// Error classes
+export {
+  PersianFontKitError,
+  FontOptimizationError,
+  ValidationError,
+  FileOperationError,
+  UnsupportedFormatError,
+  InvalidFontError,
+} from "./errors";
+
+// Validation
+export {
+  validateOptimizationOptions,
+  validateFontFile,
+  validateDirectory,
+  SUPPORTED_FORMATS,
+  SUPPORTED_OUTPUT_FORMATS,
+} from "./validation";
+
+// Cache utilities
+export {
+  FontCache,
+  getGlobalCache,
+  disableCache,
+  type CacheEntry,
+} from "./utils/cache";
+
 // React hooks
 export {
   usePersianFont,

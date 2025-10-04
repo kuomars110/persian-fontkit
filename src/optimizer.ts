@@ -21,6 +21,9 @@ import {
   generateCSSFile,
   type FontFaceOptions,
 } from "./utils/css";
+import { FontOptimizationError } from "./errors";
+import { validateOptimizationOptions, validateFontFile } from "./validation";
+import { getGlobalCache, disableCache } from "./utils/cache";
 
 export interface OptimizationOptions {
   /** Input font file path */
@@ -49,6 +52,12 @@ export interface OptimizationOptions {
 
   /** Generate hashed filename */
   useHash?: boolean;
+
+  /** Enable caching (default: true) */
+  cache?: boolean;
+
+  /** Cache directory (default: .persian-fontkit-cache) */
+  cacheDir?: string;
 }
 
 export interface OptimizationResult {
@@ -77,6 +86,26 @@ export interface OptimizationResult {
 export async function optimizeFont(
   options: OptimizationOptions
 ): Promise<OptimizationResult> {
+  // Validate input options
+  try {
+    validateOptimizationOptions(options);
+    validateFontFile(options.inputPath);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "ValidationError" ||
+        error.name === "UnsupportedFormatError" ||
+        error.name === "InvalidFontError")
+    ) {
+      throw error;
+    }
+    throw new FontOptimizationError(
+      `Validation failed: ${(error as Error).message}`,
+      options.inputPath,
+      error as Error
+    );
+  }
+
   const {
     inputPath,
     outputDir,
@@ -87,74 +116,136 @@ export async function optimizeFont(
     format = "woff2",
     fontDisplay = "swap",
     useHash = true,
+    cache = true,
+    cacheDir,
   } = options;
 
-  // Get original font metadata
-  const originalMeta = await getFontMetadata(inputPath);
+  // Check cache if enabled
+  if (cache) {
+    const fontCache = getGlobalCache(cacheDir);
+    const cached = await fontCache.get(inputPath);
 
-  // Determine font family name
-  const family =
-    fontFamily || path.basename(inputPath, path.extname(inputPath));
-
-  // Read font file
-  const fontBuffer = await readFileBuffer(inputPath);
-
-  // Get character set for subsetting
-  const characters = getSubsetCharacters(subsets);
-  const text = characters.join("");
-
-  // Subset the font
-  let subsetBuffer: Buffer;
-  try {
-    // Map format to subset-font format
-    const targetFormat = format === "ttf" ? "truetype" : format;
-
-    subsetBuffer = await subsetFont(fontBuffer, text, {
-      targetFormat,
-    });
-  } catch (error: any) {
-    throw new Error(`Failed to subset font ${inputPath}: ${error.message}`);
+    if (cached) {
+      return cached;
+    }
   }
 
-  // Generate output filename
-  const hash = useHash ? generateHash(subsetBuffer) : "";
-  const outputFilename = useHash
-    ? generateOptimizedFilename(originalMeta.name, hash, `.${format}`)
-    : `${path.basename(
-        originalMeta.name,
-        path.extname(originalMeta.name)
-      )}.${format}`;
+  try {
+    // Get original font metadata
+    const originalMeta = await getFontMetadata(inputPath);
 
-  const outputPath = path.join(outputDir, outputFilename);
+    // Determine font family name
+    const family =
+      fontFamily || path.basename(inputPath, path.extname(inputPath));
 
-  // Write optimized font
-  await writeFileBuffer(outputPath, subsetBuffer);
+    // Read font file
+    const fontBuffer = await readFileBuffer(inputPath);
 
-  // Get optimized font metadata
-  const optimizedMeta = await getFontMetadata(outputPath);
+    // Validate buffer is not empty
+    if (fontBuffer.length === 0) {
+      throw new FontOptimizationError(
+        `Font file is empty or could not be read`,
+        inputPath
+      );
+    }
 
-  // Calculate reduction
-  const reduction = calculateReduction(originalMeta.size, optimizedMeta.size);
+    // Get character set for subsetting
+    const characters = getSubsetCharacters(subsets);
+    const text = characters.join("");
 
-  // Generate CSS
-  const fontFaceOptions: FontFaceOptions = {
-    fontFamily: family,
-    fontPath: `./${outputFilename}`,
-    fontWeight,
-    fontStyle,
-    fontDisplay,
-  };
+    // Validate character set
+    if (text.length === 0) {
+      throw new FontOptimizationError(
+        `No characters to subset. Check subset configuration.`,
+        inputPath
+      );
+    }
 
-  const css = generateFontFace(fontFaceOptions);
+    // Subset the font
+    let subsetBuffer: Buffer;
+    try {
+      // Map format to subset-font format
+      const targetFormat = format === "ttf" ? "truetype" : format;
 
-  return {
-    original: originalMeta,
-    optimized: optimizedMeta,
-    reduction,
-    css,
-    fontFamily: family,
-    fontWeight,
-  };
+      subsetBuffer = await subsetFont(fontBuffer, text, {
+        targetFormat,
+      });
+    } catch (error: any) {
+      throw new FontOptimizationError(
+        `Failed to subset font: ${error.message}`,
+        inputPath,
+        error
+      );
+    }
+
+    // Validate subset result
+    if (!subsetBuffer || subsetBuffer.length === 0) {
+      throw new FontOptimizationError(
+        `Font subsetting produced empty result`,
+        inputPath
+      );
+    }
+
+    // Generate output filename
+    const hash = useHash ? generateHash(subsetBuffer) : "";
+    const outputFilename = useHash
+      ? generateOptimizedFilename(originalMeta.name, hash, `.${format}`)
+      : `${path.basename(
+          originalMeta.name,
+          path.extname(originalMeta.name)
+        )}.${format}`;
+
+    const outputPath = path.join(outputDir, outputFilename);
+
+    // Write optimized font
+    await writeFileBuffer(outputPath, subsetBuffer);
+
+    // Get optimized font metadata
+    const optimizedMeta = await getFontMetadata(outputPath);
+
+    // Calculate reduction
+    const reduction = calculateReduction(originalMeta.size, optimizedMeta.size);
+
+    // Generate CSS
+    const fontFaceOptions: FontFaceOptions = {
+      fontFamily: family,
+      fontPath: `./${outputFilename}`,
+      fontWeight,
+      fontStyle,
+      fontDisplay,
+    };
+
+    const css = generateFontFace(fontFaceOptions);
+
+    const result: OptimizationResult = {
+      original: originalMeta,
+      optimized: optimizedMeta,
+      reduction,
+      css,
+      fontFamily: family,
+      fontWeight,
+    };
+
+    // Store in cache if enabled
+    if (cache) {
+      const fontCache = getGlobalCache(cacheDir);
+      await fontCache.set(inputPath, result);
+    }
+
+    return result;
+  } catch (error) {
+    // Re-throw our custom errors
+    if (error instanceof FontOptimizationError) {
+      throw error;
+    }
+
+    // Wrap other errors
+    throw new FontOptimizationError(
+      `Font optimization failed: ${(error as Error).message}`,
+      inputPath,
+      error as Error
+    );
+  }
 }
 
 /**

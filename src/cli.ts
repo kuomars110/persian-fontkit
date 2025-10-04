@@ -37,6 +37,8 @@ program
   .option("-f, --format <format>", "Output format (woff2, woff, ttf)", "woff2")
   .option("--no-hash", "Disable hash in filenames")
   .option("--css <filename>", "CSS output filename", "fonts.css")
+  .option("--no-cache", "Disable caching")
+  .option("--cache-dir <dir>", "Cache directory", ".persian-fontkit-cache")
   .action(async (input: string, options: any) => {
     try {
       console.log(chalk.blue.bold("\n🚀 Persian FontKit Optimizer\n"));
@@ -45,15 +47,40 @@ program
       const inputDir = path.resolve(input);
       const outputDir = path.resolve(options.output);
 
+      // Validate input directory exists
+      if (!require("fs").existsSync(inputDir)) {
+        console.error(
+          chalk.red(`\n✗ Error: Input directory not found: ${inputDir}\n`)
+        );
+        process.exit(1);
+      }
+
       console.log(chalk.gray(`Input:  ${inputDir}`));
       console.log(chalk.gray(`Output: ${outputDir}\n`));
 
       // Ensure output directory exists
-      await ensureDir(outputDir);
+      try {
+        await ensureDir(outputDir);
+      } catch (error: any) {
+        console.error(
+          chalk.red(
+            `\n✗ Error: Cannot create output directory: ${error.message}\n`
+          )
+        );
+        process.exit(1);
+      }
 
       // Get font files
       console.log(chalk.cyan("📁 Scanning for font files..."));
-      const fontFiles = await getFontFiles(inputDir);
+      let fontFiles: string[];
+      try {
+        fontFiles = await getFontFiles(inputDir);
+      } catch (error: any) {
+        console.error(
+          chalk.red(`\n✗ Error: Failed to scan directory: ${error.message}\n`)
+        );
+        process.exit(1);
+      }
 
       if (fontFiles.length === 0) {
         console.log(
@@ -91,6 +118,8 @@ program
             useHash: options.hash,
             fontWeight,
             fontStyle,
+            cache: options.cache !== false,
+            cacheDir: options.cacheDir,
           });
 
           results.push(result);
@@ -103,7 +132,23 @@ program
           );
           console.log(chalk.green(`  ✓ Reduced by ${result.reduction}%\n`));
         } catch (error: any) {
-          console.log(chalk.red(`  ✗ Error: ${error.message}\n`));
+          // Show user-friendly error message
+          let errorMessage = error.message;
+
+          if (error.name === "ValidationError") {
+            errorMessage = `Validation failed: ${error.message}`;
+          } else if (error.name === "FontOptimizationError") {
+            errorMessage = `Optimization failed: ${error.message}`;
+          } else if (error.name === "InvalidFontError") {
+            errorMessage = `Invalid font: ${error.message}`;
+          }
+
+          console.log(chalk.red(`  ✗ ${errorMessage}\n`));
+
+          // Show original error in verbose mode
+          if (process.env.DEBUG) {
+            console.log(chalk.gray(`  Debug: ${error.stack}\n`));
+          }
         }
       }
 
@@ -168,6 +213,52 @@ program
   });
 
 program
+  .command("cache")
+  .description("Manage optimization cache")
+  .option("-c, --clear", "Clear the cache")
+  .option("-s, --stats", "Show cache statistics")
+  .option("--cache-dir <dir>", "Cache directory", ".persian-fontkit-cache")
+  .action(async (options: any) => {
+    try {
+      const { getGlobalCache } = await import("./utils/cache");
+      const cache = getGlobalCache(options.cacheDir);
+
+      if (options.clear) {
+        console.log(chalk.blue("\n🗑️  Clearing cache...\n"));
+        await cache.clear();
+        console.log(chalk.green("✓ Cache cleared successfully\n"));
+      } else if (options.stats) {
+        console.log(chalk.blue("\n📊 Cache Statistics\n"));
+        const stats = await cache.getStats();
+
+        console.log(chalk.gray(`Entries:      ${stats.entries}`));
+        console.log(
+          chalk.gray(`Total Size:   ${formatFileSize(stats.totalSize)}`)
+        );
+
+        if (stats.oldestEntry) {
+          const oldest = new Date(stats.oldestEntry).toLocaleString();
+          console.log(chalk.gray(`Oldest Entry: ${oldest}`));
+        }
+
+        if (stats.newestEntry) {
+          const newest = new Date(stats.newestEntry).toLocaleString();
+          console.log(chalk.gray(`Newest Entry: ${newest}`));
+        }
+
+        console.log();
+      } else {
+        console.log(
+          chalk.yellow("\n⚠️  Please specify an action: --clear or --stats\n")
+        );
+      }
+    } catch (error: any) {
+      console.error(chalk.red(`\n✗ Error: ${error.message}\n`));
+      process.exit(1);
+    }
+  });
+
+program
   .command("info")
   .description("Show information about persian-fontkit")
   .action(() => {
@@ -183,6 +274,7 @@ program
       chalk.gray("  • Support for multiple formats (woff2, woff, ttf)")
     );
     console.log(chalk.gray("  • Cache-busting with file hashing"));
+    console.log(chalk.gray("  • Smart caching system"));
     console.log(chalk.gray("  • React hooks for dynamic loading"));
     console.log(chalk.gray("  • Next.js integration\n"));
 
