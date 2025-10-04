@@ -1,6 +1,6 @@
 {
   "name": "persian-fontkit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Automatic Persian (Farsi) web font optimizer for Next.js and React with subsetting, preloading, and SSR support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
