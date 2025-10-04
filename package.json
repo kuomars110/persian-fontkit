@@ -1,0 +1,86 @@
+{
+  "name": "persian-fontkit",
+  "version": "1.0.0",
+  "description": "Automatic Persian (Farsi) web font optimizer for Next.js and React with subsetting, preloading, and SSR support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "persian-fontkit": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./plugin": {
+      "import": "./dist/next-plugin.js",
+      "require": "./dist/next-plugin.js",
+      "types": "./dist/next-plugin.d.ts"
+    },
+    "./hooks": {
+      "import": "./dist/hooks/usePersianFont.js",
+      "require": "./dist/hooks/usePersianFont.js",
+      "types": "./dist/hooks/usePersianFont.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Tests coming soon\" && exit 0"
+  },
+  "keywords": [
+    "persian",
+    "farsi",
+    "font",
+    "optimization",
+    "nextjs",
+    "react",
+    "subset",
+    "webfont",
+    "iran",
+    "vazir",
+    "performance",
+    "core-web-vitals"
+  ],
+  "author": "Kioumars Rahimi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuomars110/persian-fontkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kuomars110/persian-fontkit/issues"
+  },
+  "homepage": "https://github.com/kuomars110/persian-fontkit#readme",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "subset-font": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "next": ">=13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
