@@ -8,7 +8,7 @@
 
 **Automatic Persian (Farsi) web font optimizer for Next.js and React**
 
-Reduce font file sizes by 60-80% • Improve Core Web Vitals • SSR-Safe • Zero Config
+Reduce font file sizes by 60-80% • Improve Core Web Vitals • Zero Config
 
 [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Examples](#-examples) • [API](#-api)
 
@@ -48,10 +48,11 @@ Persian fonts like **Vazir**, **IRANSans**, **Shabnam**, **Yekan**, and **Kalame
 
 ### ⚛️ React Integration
 
-- `usePersianFont` hook for dynamic font loading
-- SSR-safe (works with Next.js server components)
-- Automatic `<link rel="preload">` injection
+- `usePersianFont` hook for client-side dynamic font loading
+- SSR-compatible (doesn't break server rendering)
+- Automatic `<link rel="preload">` injection (client-side)
 - TypeScript support with full type definitions
+- **Note:** For true SSR, use static preload in `layout.tsx` (see below)
 
 ### 🚀 Next.js Plugin
 
@@ -115,14 +116,15 @@ Output: /path/to/dist/fonts
   Size reduction: 75.5%
 ```
 
-### 2. React Hook Usage
+### 2. React Hook Usage (Client-Side)
 
 ```tsx
-"use client";
+"use client"; // ⚠️ Required: Hook only works in client components
 
 import { usePersianFont } from "persian-fontkit/hooks";
 
 export default function MyComponent() {
+  // Loads fonts dynamically after page hydration
   usePersianFont({
     family: "Vazir",
     weight: [400, 700],
@@ -139,9 +141,13 @@ export default function MyComponent() {
 }
 ```
 
+> **Note:** This hook runs client-side only (using `useEffect`). For SSR, see [Next.js Integration](#3-nextjs-integration).
+
 ### 3. Next.js Integration
 
-#### Option A: Manual Preload (Recommended)
+#### Option A: Static Preload (Recommended for SSR) ✨
+
+For true server-side rendering with optimal performance:
 
 ```tsx
 // app/layout.tsx
@@ -153,6 +159,7 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl">
       <head>
+        {/* ✅ This runs on the server - true SSR */}
         <link
           rel="preload"
           href="/fonts/vazir-400.woff2"
@@ -160,6 +167,13 @@ export default function RootLayout({
           type="font/woff2"
           crossOrigin="anonymous"
         />
+        <style>{`
+          @font-face {
+            font-family: 'Vazir';
+            src: url('/fonts/vazir-400.woff2') format('woff2');
+            font-display: swap;
+          }
+        `}</style>
       </head>
       <body>{children}</body>
     </html>
@@ -167,7 +181,28 @@ export default function RootLayout({
 }
 ```
 
-#### Option B: Next.js Plugin
+#### Option B: Client-Side Hook (For Dynamic Loading) ⚡
+
+For client-side dynamic font loading (after page hydration):
+
+```tsx
+"use client";
+
+import { usePersianFont } from "persian-fontkit/hooks";
+
+export default function MyComponent() {
+  // ⚠️ This runs only in the browser (useEffect)
+  usePersianFont({
+    family: "Vazir",
+    weight: [400, 700],
+    basePath: "/fonts",
+  });
+
+  return <div style={{ fontFamily: "Vazir" }}>محتوای شما</div>;
+}
+```
+
+#### Option C: Next.js Plugin (Build-Time Optimization)
 
 ```js
 // next.config.js
@@ -180,7 +215,38 @@ module.exports = withPersianFonts({
 
 ---
 
-## 📚 Usage Examples
+## � SSR vs Client-Side: Which Should I Use?
+
+### ✅ Use Static Preload (Option A) when:
+
+- You want **true server-side rendering**
+- First paint performance is critical
+- You know your fonts at build time
+- SEO and Core Web Vitals are important
+- **Recommended for production apps**
+
+### ⚡ Use Client-Side Hook (Option B) when:
+
+- You need **dynamic font loading** based on user preferences
+- Loading fonts conditionally (e.g., language switcher)
+- Building interactive demos or playgrounds
+- Font selection happens at runtime
+
+### 🎯 Technical Details:
+
+| Feature         | Static Preload     | Client Hook         |
+| --------------- | ------------------ | ------------------- |
+| **Execution**   | Server-side        | Client-side only    |
+| **Load Time**   | Before first paint | After hydration     |
+| **SSR Support** | ✅ True SSR        | ⚠️ SSR-compatible\* |
+| **Performance** | Faster FCP/LCP     | Slower initial load |
+| **Use Case**    | Production apps    | Dynamic scenarios   |
+
+\*SSR-compatible means it won't break during server rendering (safe `window` check), but actual font loading happens only in the browser.
+
+---
+
+## �📚 Usage Examples
 
 ### CLI Options
 
@@ -363,7 +429,9 @@ Optimize a single font file.
 
 ### `usePersianFont(options)`
 
-React hook for dynamic font loading.
+React hook for **client-side** dynamic font loading.
+
+> **⚠️ Important:** This hook uses `useEffect` and only runs in the browser (after hydration). It won't execute during server-side rendering. For true SSR, use static `<link>` tags in your layout component.
 
 **Options:**
 
@@ -372,7 +440,7 @@ React hook for dynamic font loading.
 - `subsets` (string[], optional): Character subsets
 - `basePath` (string, optional): Base path for fonts
 - `display` (string, optional): font-display property
-- `preload` (boolean, optional): Add preload links
+- `preload` (boolean, optional): Add preload links (client-side)
 - `fallback` (string[], optional): Fallback fonts
 
 ### `withPersianFonts(config, nextConfig)`

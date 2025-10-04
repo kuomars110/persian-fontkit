@@ -8,9 +8,11 @@ declare module "subset-font" {
     preserveNameIds?: number[];
   }
 
-  export function subsetFont(
+  function subsetFont(
     buffer: Buffer,
     text: string,
     options?: SubsetFontOptions
   ): Promise<Buffer>;
+
+  export = subsetFont;
 }

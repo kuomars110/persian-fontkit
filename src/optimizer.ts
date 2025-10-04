@@ -4,7 +4,7 @@
  */
 
 import * as path from "path";
-import { subsetFont } from "subset-font";
+import subsetFont from "subset-font";
 import {
   readFileBuffer,
   writeFileBuffer,
